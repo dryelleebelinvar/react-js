@@ -9,6 +9,7 @@ import {Link} from 'react-router-dom';
 import {collection, getDocs, orderBy, limit, startAfter, query} from 'firebase/firestore';
 import {db} from '../../services/firebaseConnection';
 import {format} from 'date-fns';
+import Modal from '../../components/Modal';
 import './dashboard.css';
 
 const listRef = collection(db, "chamados")
@@ -22,6 +23,9 @@ export default function Dashboard(){
 
     const [lastDocs, setLastDocs] = useState();
     const [loadingMore, setLoadingMore] = useState(false);
+
+    const [showPostModal, setShowPostModal] = useState(false);
+    const [detail, setDetail] = useState()
 
     useEffect(() => {
         async function loadChamados(){
@@ -53,10 +57,25 @@ export default function Dashboard(){
                     complemento: doc.data().complemento,
                 })
             })
+            const lastDoc = querySnapshot.docs[querySnapshot.docs.length - 1] //pegando o último item
             setChamados(chamados => [...chamados, ...lista])
+            setLastDocs(lastDoc);
         }else{
             setIsEmpty(true);
         }
+        setLoadingMore(false);
+    }
+    
+    async function handleMore(){
+        setLoadingMore(true);
+        const q = query(listRef, orderBy('created', 'desc'), startAfter(lastDocs), limit(5));
+        const querySnapshot = await getDocs(q);
+        await updateState(querySnapshot);
+    }
+
+    function toggleModal(item){
+        setShowPostModal(!showPostModal)
+        setDetail(item)
     }
 
     if(loading){
@@ -115,28 +134,36 @@ export default function Dashboard(){
                                                 <td data-label="Cliente">{item.cliente}</td>
                                                 <td data-label="Assunto">{item.assunto}</td>
                                                 <td data-label="Status">
-                                                    <span className="badge" style={{backgroundColor: '#999'}}>
+                                                    <span className="badge" style={{backgroundColor: item.status === 'Aberto' ? '#5cb85c' : '#999'}}>
                                                         {item.status}
                                                     </span>
                                                 </td>
                                                 <td data-label="Cadastrado">{item.createdFormat}</td>
                                                 <td data-label="#">
-                                                    <button className="action" style={{backgroundColor: '#3583f6'}}>
+                                                    <button className="action" style={{backgroundColor: '#3583f6'}} onClick={() => toggleModal(item)}>
                                                         <FiSearch color="#fff" size={17}/>
                                                     </button>
-                                                    <button className="action" style={{backgroundColor: '#f6a935'}}> 
+                                                    <Link to={`/new/${item.id}`} className="action" style={{backgroundColor: '#f6a935'}}> 
                                                         <FiEdit2 color="#fff" size={17}/>
-                                                    </button>
+                                                    </Link>
                                                 </td>
                                             </tr>
                                         )
                                     })}
                                 </tbody>
                             </table>
+                            {loadingMore && <h3>Buscando mais chamados...</h3>}
+                            {!loadingMore && !isEmpty && <button className="btn-more" onClick={handleMore}>Burcar mais</button>}
                         </>
                     )}
                 </>
             </div>
+            {showPostModal && (
+                <Modal
+                    conteudo={detail}
+                    close={() => setShowPostModal(!showPostModal)}
+                />
+            )}
         </div>
     )
 }
